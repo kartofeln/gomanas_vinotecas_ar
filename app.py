@@ -3,6 +3,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from datetime import datetime
+import os
 
 st.set_page_config(
     page_title="🍷 VinotecaFinder Argentina",
@@ -36,23 +37,36 @@ st.markdown("""
 st.markdown("""
 <div class="main-header">
     <h1>🍷 VinotecaFinder Argentina</h1>
-    <p>Busca vinotecas en Argentina usando nuestra API local</p>
+    <p>Busca vinotecas en Argentina con datos en tiempo real</p>
 </div>
 """, unsafe_allow_html=True)
 
+# Configuración de la API
+def get_api_url():
+    """Obtener la URL de la API según el entorno"""
+    # En producción, usar la URL de Railway (cuando esté disponible)
+    production_url = os.getenv('API_URL', '')
+    if production_url:
+        return production_url
+    
+    # En desarrollo, usar localhost
+    return "http://localhost:3000"
+
 # Función para buscar vinotecas
 def search_vinotecas(location):
-    """Buscar vinotecas usando la API local"""
+    """Buscar vinotecas usando la API"""
+    api_url = get_api_url()
+    
     try:
-        url = "http://localhost:3000/api/search"
+        url = f"{api_url}/api/search"
         params = {"location": location}
         
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, params=params, timeout=15)
         response.raise_for_status()
         
         return response.json()
     except requests.exceptions.ConnectionError:
-        st.error("❌ No se puede conectar con la API local. Asegúrate de que el servidor esté corriendo en localhost:3000")
+        st.error(f"❌ No se puede conectar con la API en {api_url}")
         return None
     except requests.exceptions.Timeout:
         st.error("⏰ La búsqueda tardó demasiado. Intenta de nuevo.")
@@ -61,8 +75,26 @@ def search_vinotecas(location):
         st.error(f"❌ Error: {str(e)}")
         return None
 
+# Función para verificar estado de la API
+def check_api_status():
+    """Verificar si la API está disponible"""
+    api_url = get_api_url()
+    
+    try:
+        response = requests.get(f"{api_url}/api/health", timeout=5)
+        return response.status_code == 200
+    except:
+        return False
+
 # Interfaz principal
 st.write("### 🔍 Buscar Vinotecas")
+
+# Mostrar estado de la API
+api_status = check_api_status()
+if api_status:
+    st.success("✅ API conectada y funcionando")
+else:
+    st.warning("⚠️ API no disponible - Usando datos simulados")
 
 # Campo de búsqueda
 location = st.text_input(
@@ -138,17 +170,15 @@ if location:
 # Información adicional
 st.write("---")
 st.write("### ℹ️ Información")
-st.write("Esta aplicación se conecta a una API local que debe estar corriendo en `localhost:3000`")
-st.write("Para iniciar la API, ejecuta: `node server.js` en la terminal")
+if api_status:
+    st.write("✅ Conectado a la API en producción")
+else:
+    st.write("⚠️ Ejecutando en modo local - Inicia la API con: `node server.js`")
 
 # Estado de la API
 st.write("### 🔌 Estado de la API")
 if st.button("🔍 Verificar conexión con la API"):
-    try:
-        response = requests.get("http://localhost:3000/api/health", timeout=5)
-        if response.status_code == 200:
-            st.success("✅ API conectada y funcionando")
-        else:
-            st.warning("⚠️ API responde pero con error")
-    except:
-        st.error("❌ No se puede conectar con la API en localhost:3000") 
+    if check_api_status():
+        st.success("✅ API conectada y funcionando")
+    else:
+        st.error("❌ No se puede conectar con la API") 
