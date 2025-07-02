@@ -1,0 +1,21 @@
+# Dependencias del sistema para Streamlit Cloud
+# Estas se instalan antes que las dependencias de Python
+
+# Compiladores y herramientas de build
+build-essential
+python3-dev
+
+# Dependencias para pandas y numpy
+libatlas-base-dev
+gfortran
+
+# Dependencias para folium y mapas
+libgeos-dev
+libproj-dev
+proj-data
+proj-bin
+libgdal-dev
+
+# Dependencias para requests y SSL
+ca-certificates
+curl 
