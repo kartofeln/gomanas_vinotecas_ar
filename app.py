@@ -88,24 +88,150 @@ st.markdown("""
 # Clase para manejar la búsqueda de vinotecas
 class VinotecaSearch:
     def __init__(self):
-        self.base_url = "http://localhost:3000"  # URL de tu API Node.js
+        self.dataforseo_username = st.secrets.get("DATAFORSEO_USERNAME", "")
+        self.dataforseo_password = st.secrets.get("DATAFORSEO_PASSWORD", "")
         
     def search_vinotecas(self, location):
-        """Buscar vinotecas usando la API"""
+        """Buscar vinotecas usando DataForSEO API o datos simulados"""
         try:
-            url = f"{self.base_url}/api/search"
-            params = {"location": location}
-            
-            response = requests.get(url, params=params, timeout=30)
-            response.raise_for_status()
-            
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            st.error(f"Error al conectar con la API: {str(e)}")
-            return None
+            # Si tenemos credenciales de DataForSEO, usarlas
+            if self.dataforseo_username and self.dataforseo_password:
+                return self._search_with_dataforseo(location)
+            else:
+                # Usar datos simulados
+                return self._get_simulated_data(location)
         except Exception as e:
             st.error(f"Error inesperado: {str(e)}")
-            return None
+            return self._get_simulated_data(location)
+    
+    def _search_with_dataforseo(self, location):
+        """Buscar usando DataForSEO API"""
+        try:
+            import base64
+            
+            # Codificar credenciales
+            credentials = base64.b64encode(f"{self.dataforseo_username}:{self.dataforseo_password}".encode()).decode()
+            
+            # URL de la API
+            url = "https://api.dataforseo.com/v3/business_data/google/my_business_info/task_post"
+            
+            headers = {
+                "Authorization": f"Basic {credentials}",
+                "Content-Type": "application/json"
+            }
+            
+            # Datos de la búsqueda
+            data = [{
+                "keyword": f"vinotecas {location} argentina",
+                "location_name": location,
+                "language_name": "Spanish"
+            }]
+            
+            response = requests.post(url, headers=headers, json=data, timeout=30)
+            response.raise_for_status()
+            
+            result = response.json()
+            
+            # Procesar resultados
+            if result.get("status_code") == 20000:
+                tasks = result.get("tasks", [])
+                if tasks and tasks[0].get("result"):
+                    items = tasks[0]["result"][0].get("items", [])
+                    
+                    vinotecas = []
+                    for item in items[:20]:  # Limitar a 20 resultados
+                        vinoteca = {
+                            "name": item.get("title", "Vinoteca"),
+                            "address": item.get("address", "Dirección no disponible"),
+                            "rating": item.get("rating", "No disponible"),
+                            "source": "DataForSEO"
+                        }
+                        vinotecas.append(vinoteca)
+                    
+                    return {"success": True, "vinotecas": vinotecas}
+            
+            # Si no hay resultados de DataForSEO, usar datos simulados
+            return self._get_simulated_data(location)
+            
+        except Exception as e:
+            st.warning(f"No se pudo conectar con DataForSEO: {str(e)}")
+            return self._get_simulated_data(location)
+    
+    def _get_simulated_data(self, location):
+        """Generar datos simulados de vinotecas"""
+        import random
+        
+        # Datos simulados por ciudad
+        city_data = {
+            "mendoza": [
+                {"name": "Bodega La Rural", "address": "Av. San Martín 2724, Mendoza", "rating": "4.5"},
+                {"name": "Vinoteca Mendoza", "address": "Belgrano 1194, Mendoza", "rating": "4.3"},
+                {"name": "Wine Store Mendoza", "address": "Sarmiento 123, Mendoza", "rating": "4.7"},
+                {"name": "Bodega Trapiche", "address": "Nueva Mayorga s/n, Coquimbito", "rating": "4.6"},
+                {"name": "Vinoteca San Martín", "address": "San Martín 456, Mendoza", "rating": "4.2"}
+            ],
+            "palermo": [
+                {"name": "Vinoteca Palermo", "address": "Av. Santa Fe 1234, Palermo", "rating": "4.4"},
+                {"name": "Wine Bar Palermo", "address": "Gorriti 567, Palermo", "rating": "4.6"},
+                {"name": "Bodega Palermo", "address": "Honduras 890, Palermo", "rating": "4.3"},
+                {"name": "Vinoteca Soho", "address": "El Salvador 234, Palermo", "rating": "4.5"},
+                {"name": "Wine Store Palermo", "address": "Niceto Vega 456, Palermo", "rating": "4.1"}
+            ],
+            "recoleta": [
+                {"name": "Vinoteca Recoleta", "address": "Av. Alvear 123, Recoleta", "rating": "4.8"},
+                {"name": "Wine Bar Recoleta", "address": "Posadas 456, Recoleta", "rating": "4.6"},
+                {"name": "Bodega Recoleta", "address": "Ayacucho 789, Recoleta", "rating": "4.4"},
+                {"name": "Vinoteca Centro", "address": "Montevideo 234, Recoleta", "rating": "4.3"},
+                {"name": "Wine Store Recoleta", "address": "Uriburu 567, Recoleta", "rating": "4.5"}
+            ],
+            "córdoba": [
+                {"name": "Vinoteca Córdoba", "address": "Av. Hipólito Yrigoyen 123, Córdoba", "rating": "4.3"},
+                {"name": "Wine Bar Córdoba", "address": "San Martín 456, Córdoba", "rating": "4.5"},
+                {"name": "Bodega Córdoba", "address": "Belgrano 789, Córdoba", "rating": "4.2"},
+                {"name": "Vinoteca Nueva Córdoba", "address": "Obispo Trejo 234, Córdoba", "rating": "4.4"},
+                {"name": "Wine Store Córdoba", "address": "Rivadavia 567, Córdoba", "rating": "4.1"}
+            ],
+            "rosario": [
+                {"name": "Vinoteca Rosario", "address": "San Martín 123, Rosario", "rating": "4.2"},
+                {"name": "Wine Bar Rosario", "address": "Córdoba 456, Rosario", "rating": "4.4"},
+                {"name": "Bodega Rosario", "address": "Santa Fe 789, Rosario", "rating": "4.3"},
+                {"name": "Vinoteca Centro Rosario", "address": "San Lorenzo 234, Rosario", "rating": "4.1"},
+                {"name": "Wine Store Rosario", "address": "Mitre 567, Rosario", "rating": "4.0"}
+            ]
+        }
+        
+        # Buscar datos para la ciudad
+        location_lower = location.lower()
+        if location_lower in city_data:
+            base_vinotecas = city_data[location_lower]
+        else:
+            # Datos genéricos para otras ciudades
+            base_vinotecas = [
+                {"name": f"Vinoteca {location}", "address": f"Av. Principal 123, {location}", "rating": "4.3"},
+                {"name": f"Wine Bar {location}", "address": f"San Martín 456, {location}", "rating": "4.5"},
+                {"name": f"Bodega {location}", "address": f"Belgrano 789, {location}", "rating": "4.2"},
+                {"name": f"Wine Store {location}", "address": f"Rivadavia 234, {location}", "rating": "4.1"},
+                {"name": f"Vinoteca Central {location}", "address": f"Independencia 567, {location}", "rating": "4.4"}
+            ]
+        
+        # Generar más vinotecas aleatorias
+        vinotecas = []
+        for i, base in enumerate(base_vinotecas):
+            vinoteca = base.copy()
+            vinoteca["source"] = "Datos Simulados"
+            vinotecas.append(vinoteca)
+            
+            # Agregar algunas variaciones
+            if i < 3:
+                for j in range(2):
+                    variation = base.copy()
+                    variation["name"] = f"{base['name']} - Sucursal {j+1}"
+                    variation["address"] = f"Av. {random.choice(['Libertad', 'Independencia', 'San Juan', 'Corrientes'])} {random.randint(100, 999)}, {location}"
+                    variation["rating"] = f"{random.uniform(3.8, 4.8):.1f}"
+                    variation["source"] = "Datos Simulados"
+                    vinotecas.append(variation)
+        
+        return {"success": True, "vinotecas": vinotecas}
 
 # Inicializar el buscador
 @st.cache_resource
