@@ -132,11 +132,23 @@ La aplicación Streamlit incluye:
    - Ve a [share.streamlit.io](https://share.streamlit.io)
    - Conecta tu repositorio de GitHub
    - Configura el archivo principal: `app.py`
+   - **Python version:** 3.11 (importante para compatibilidad)
    - Configura variables de entorno si es necesario
 
-3. **Deploy automático**
+3. **Configurar variables de entorno**
+   - `DATAFORSEO_LOGIN`: Tu login de DataForSEO
+   - `DATAFORSEO_PASSWORD`: Tu password de DataForSEO
+
+4. **Deploy automático**
    - Streamlit Cloud detectará cambios automáticamente
    - Tu app estará disponible en `https://tu-app.streamlit.app`
+
+**⚠️ Nota importante:** Si ves errores de compilación de pandas, asegúrate de:
+- Usar Python 3.11 en Streamlit Cloud
+- Tener todas las dependencias actualizadas en `requirements.txt`
+- El archivo `packages.txt` incluye dependencias del sistema necesarias
+- **IMPORTANTE**: El archivo `packages.txt` NO debe contener comentarios, solo nombres de paquetes
+- **SOLUCIÓN RÁPIDA**: Si persisten errores, haz un commit vacío para forzar redeploy
 
 ### Heroku
 
