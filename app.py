@@ -8,6 +8,7 @@ from streamlit_option_menu import option_menu
 import time
 import json
 from datetime import datetime
+import random
 
 # Configuración de la página
 st.set_page_config(
@@ -159,10 +160,6 @@ class VinotecaSearch:
     
     def _get_simulated_data(self, location):
         """Generar datos simulados de vinotecas"""
-        import random
-        
-        # Debug log
-        st.write(f"🔍 Generando datos simulados para: {location}")
         
         # Datos simulados por ciudad
         city_data = {
@@ -420,11 +417,7 @@ def main():
                         status_text.text("¡Listo!")
                 
                 # Realizar búsqueda real
-                st.info(f"🔍 Buscando vinotecas en: {location}")
                 result = searcher.search_vinotecas(location)
-                
-                # Debug: mostrar el resultado
-                st.write("Debug - Resultado:", result)
                 
                 if result and result.get('success'):
                     vinotecas = result.get('vinotecas', [])
