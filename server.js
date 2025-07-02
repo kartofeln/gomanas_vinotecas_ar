@@ -816,7 +816,17 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Health check
+// Health check para Railway
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        service: 'Vinoteca Search API',
+        version: '1.0.0'
+    });
+});
+
+// Health check alternativo
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
@@ -833,8 +843,8 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-    console.log(`📊 API disponible en http://localhost:${PORT}/api/search`);
-    console.log(`🔍 Ejemplo: http://localhost:${PORT}/api/search?location=Palermo`);
->>>>>>> origin/main
-}); 
+    console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+    console.log(`📊 API disponible en /api/search`);
+    console.log(`🔍 Ejemplo: /api/search?location=Palermo`);
+    console.log(`💚 Health check: /api/health`);
+});
