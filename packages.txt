@@ -2,4 +2,10 @@ build-essential
 python3-dev
 libatlas-base-dev
 gfortran
-ca-certificates 
+ca-certificates
+libgeos-dev
+libproj-dev
+proj-data
+proj-bin
+libgdal-dev
+curl
