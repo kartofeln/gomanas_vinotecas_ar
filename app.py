@@ -161,6 +161,9 @@ class VinotecaSearch:
         """Generar datos simulados de vinotecas"""
         import random
         
+        # Debug log
+        st.write(f"🔍 Generando datos simulados para: {location}")
+        
         # Datos simulados por ciudad
         city_data = {
             "mendoza": [
@@ -386,15 +389,18 @@ def main():
         st.markdown("### 📍 Ubicaciones Populares")
         popular_locations = ["Mendoza", "Palermo", "Recoleta", "San Telmo", "Córdoba", "Rosario"]
         
+        # Variable para controlar la búsqueda
+        search_triggered = False
+        
         cols = st.columns(len(popular_locations))
         for i, loc in enumerate(popular_locations):
             with cols[i]:
                 if st.button(loc, key=f"btn_{loc}"):
                     location = loc
-                    search_button = True
+                    search_triggered = True
         
         # Realizar búsqueda
-        if search_button and location:
+        if (search_button or search_triggered) and location:
             with st.spinner("🔍 Buscando vinotecas..."):
                 # Mostrar progreso
                 progress_bar = st.progress(0)
@@ -414,7 +420,11 @@ def main():
                         status_text.text("¡Listo!")
                 
                 # Realizar búsqueda real
+                st.info(f"🔍 Buscando vinotecas en: {location}")
                 result = searcher.search_vinotecas(location)
+                
+                # Debug: mostrar el resultado
+                st.write("Debug - Resultado:", result)
                 
                 if result and result.get('success'):
                     vinotecas = result.get('vinotecas', [])
