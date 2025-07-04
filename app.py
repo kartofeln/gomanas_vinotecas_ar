@@ -54,7 +54,7 @@ def get_api_url():
 
 # Función para buscar vinotecas
 def search_vinotecas(location):
-    """Buscar vinotecas usando la API"""
+    """Buscar vinotecas usando la API o datos simulados"""
     api_url = get_api_url()
     
     try:
@@ -66,14 +66,66 @@ def search_vinotecas(location):
         
         return response.json()
     except requests.exceptions.ConnectionError:
-        st.error(f"❌ No se puede conectar con la API en {api_url}")
-        return None
+        st.warning(f"⚠️ API no disponible en {api_url}, usando datos simulados...")
+        return get_simulated_data(location)
     except requests.exceptions.Timeout:
-        st.error("⏰ La búsqueda tardó demasiado. Intenta de nuevo.")
-        return None
+        st.warning("⏰ API tardó demasiado, usando datos simulados...")
+        return get_simulated_data(location)
     except Exception as e:
-        st.error(f"❌ Error: {str(e)}")
-        return None
+        st.warning(f"⚠️ Error con la API: {str(e)}, usando datos simulados...")
+        return get_simulated_data(location)
+
+def get_simulated_data(location):
+    """Generar datos simulados de vinotecas"""
+    import random
+    
+    # Datos simulados por ciudad
+    city_data = {
+        "mendoza": [
+            {"name": "Bodega La Rural", "address": "Av. San Martín 2724, Mendoza", "rating": "4.5", "source": "Datos Simulados"},
+            {"name": "Vinoteca Mendoza", "address": "Belgrano 1194, Mendoza", "rating": "4.3", "source": "Datos Simulados"},
+            {"name": "Wine Store Mendoza", "address": "Sarmiento 123, Mendoza", "rating": "4.7", "source": "Datos Simulados"},
+            {"name": "Bodega Trapiche", "address": "Nueva Mayorga s/n, Coquimbito", "rating": "4.6", "source": "Datos Simulados"},
+            {"name": "Vinoteca San Martín", "address": "San Martín 456, Mendoza", "rating": "4.2", "source": "Datos Simulados"}
+        ],
+        "palermo": [
+            {"name": "Vinoteca Palermo", "address": "Av. Santa Fe 1234, Palermo", "rating": "4.4", "source": "Datos Simulados"},
+            {"name": "Wine Bar Palermo", "address": "Gorriti 567, Palermo", "rating": "4.6", "source": "Datos Simulados"},
+            {"name": "Bodega Palermo", "address": "Honduras 890, Palermo", "rating": "4.3", "source": "Datos Simulados"},
+            {"name": "Vinoteca Soho", "address": "El Salvador 234, Palermo", "rating": "4.5", "source": "Datos Simulados"},
+            {"name": "Wine Store Palermo", "address": "Niceto Vega 456, Palermo", "rating": "4.1", "source": "Datos Simulados"}
+        ],
+        "córdoba": [
+            {"name": "Vinoteca Córdoba", "address": "Av. Hipólito Yrigoyen 123, Córdoba", "rating": "4.3", "source": "Datos Simulados"},
+            {"name": "Wine Bar Córdoba", "address": "San Martín 456, Córdoba", "rating": "4.5", "source": "Datos Simulados"},
+            {"name": "Bodega Córdoba", "address": "Belgrano 789, Córdoba", "rating": "4.2", "source": "Datos Simulados"},
+            {"name": "Vinoteca Nueva Córdoba", "address": "Obispo Trejo 234, Córdoba", "rating": "4.4", "source": "Datos Simulados"},
+            {"name": "Wine Store Córdoba", "address": "Rivadavia 567, Córdoba", "rating": "4.1", "source": "Datos Simulados"}
+        ],
+        "san telmo": [
+            {"name": "Vinoteca San Telmo", "address": "Defensa 123, San Telmo", "rating": "4.4", "source": "Datos Simulados"},
+            {"name": "Wine Bar San Telmo", "address": "Balcarce 456, San Telmo", "rating": "4.6", "source": "Datos Simulados"},
+            {"name": "Bodega San Telmo", "address": "Bolívar 789, San Telmo", "rating": "4.3", "source": "Datos Simulados"},
+            {"name": "Vinoteca Histórica", "address": "Humberto Primo 234, San Telmo", "rating": "4.5", "source": "Datos Simulados"},
+            {"name": "Wine Store San Telmo", "address": "Carlos Calvo 567, San Telmo", "rating": "4.2", "source": "Datos Simulados"}
+        ]
+    }
+    
+    # Buscar datos para la ciudad
+    location_lower = location.lower()
+    if location_lower in city_data:
+        vinotecas = city_data[location_lower]
+    else:
+        # Datos genéricos para otras ciudades
+        vinotecas = [
+            {"name": f"Vinoteca {location}", "address": f"Av. Principal 123, {location}", "rating": "4.3", "source": "Datos Simulados"},
+            {"name": f"Wine Bar {location}", "address": f"San Martín 456, {location}", "rating": "4.5", "source": "Datos Simulados"},
+            {"name": f"Bodega {location}", "address": f"Belgrano 789, {location}", "rating": "4.2", "source": "Datos Simulados"},
+            {"name": f"Wine Store {location}", "address": f"Rivadavia 234, {location}", "rating": "4.1", "source": "Datos Simulados"},
+            {"name": f"Vinoteca Central {location}", "address": f"Independencia 567, {location}", "rating": "4.4", "source": "Datos Simulados"}
+        ]
+    
+    return {"success": True, "vinotecas": vinotecas, "note": "Datos simulados - API no disponible"}
 
 # Función para verificar estado de la API
 def check_api_status():
