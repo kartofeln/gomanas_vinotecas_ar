@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍷 VinotecaFinder Argentina - Búsqueda Personalizada</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-wine-bottle"></i>
+                    <h1>VinotecaFinder</h1>
+                </div>
+                <p class="subtitle">Encuentra las mejores vinotecas de Argentina</p>
+            </div>
+        </header>
+
+        <!-- Search Section -->
+        <section class="search-section">
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Buscar vinotecas en..." class="search-input">
+                    <button id="searchBtn" class="search-btn">
+                        <i class="fas fa-search"></i>
+                        Buscar
+                    </button>
+                </div>
+
+                <!-- Filters -->
+                <div class="filters">
+                    <div class="filter-group">
+                        <label for="typeFilter">Tipo:</label>
+                        <select id="typeFilter" class="filter-select">
+                            <option value="vinotecas">Vinotecas</option>
+                            <option value="bodegas">Bodegas</option>
+                            <option value="tiendas">Tiendas de Vino</option>
+                            <option value="enotecas">Enotecas</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="ratingFilter">Calificación mínima:</label>
+                        <select id="ratingFilter" class="filter-select">
+                            <option value="">Cualquier calificación</option>
+                            <option value="4">4+ estrellas</option>
+                            <option value="4.5">4.5+ estrellas</option>
+                            <option value="5">5 estrellas</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="deliveryFilter">
+                            <span class="checkmark"></span>
+                            Con envío a domicilio
+                        </label>
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="onlineFilter">
+                            <span class="checkmark"></span>
+                            Con tienda online
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section class="results-section" id="resultsSection" style="display: none;">
+            <div class="results-header">
+                <h2 id="resultsTitle">Resultados de búsqueda</h2>
+                <div class="results-stats" id="resultsStats"></div>
+            </div>
+
+            <div class="results-container" id="resultsContainer">
+                <!-- Results will be populated here -->
+            </div>
+
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Buscando vinotecas...</p>
+            </div>
+
+            <div class="no-results" id="noResults" style="display: none;">
+                <i class="fas fa-search"></i>
+                <h3>No se encontraron resultados</h3>
+                <p>Intenta con otra ubicación o ajusta los filtros</p>
+            </div>
+        </section>
+
+        <!-- Client Info -->
+        <section class="client-info" id="clientInfo" style="display: none;">
+            <div class="client-card">
+                <h3>Información del Cliente</h3>
+                <div class="client-details" id="clientDetails"></div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal for detailed info -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // Client URL handling
+        document.addEventListener('DOMContentLoaded', function () {
+            const urlParams = new URLSearchParams(window.location.search);
+
+            // Set initial values from URL parameters
+            if (urlParams.get('location')) {
+                document.getElementById('searchInput').value = urlParams.get('location');
+            }
+
+            if (urlParams.get('type')) {
+                document.getElementById('typeFilter').value = urlParams.get('type');
+            }
+
+            if (urlParams.get('rating')) {
+                document.getElementById('ratingFilter').value = urlParams.get('rating');
+            }
+
+            if (urlParams.get('delivery') === 'true') {
+                document.getElementById('deliveryFilter').checked = true;
+            }
+
+            if (urlParams.get('online') === 'true') {
+                document.getElementById('onlineFilter').checked = true;
+            }
+
+            // Apply theme if specified
+            if (urlParams.get('theme')) {
+                document.body.className = `theme-${urlParams.get('theme')}`;
+            }
+
+            // Show client info if tracking parameters are present
+            const trackingParams = ['utm_source', 'utm_medium', 'utm_campaign'];
+            const hasTracking = trackingParams.some(param => urlParams.get(param));
+
+            if (hasTracking) {
+                showClientInfo(urlParams);
+            }
+
+            // Auto-search if location is provided
+            if (urlParams.get('location')) {
+                setTimeout(() => {
+                    performSearch();
+                }, 500);
+            }
+        });
+
+        function showClientInfo(urlParams) {
+            const clientInfo = document.getElementById('clientInfo');
+            const clientDetails = document.getElementById('clientDetails');
+
+            let details = '<ul>';
+
+            if (urlParams.get('utm_source')) {
+                details += `<li><strong>Fuente:</strong> ${urlParams.get('utm_source')}</li>`;
+            }
+
+            if (urlParams.get('utm_medium')) {
+                details += `<li><strong>Medio:</strong> ${urlParams.get('utm_medium')}</li>`;
+            }
+
+            if (urlParams.get('utm_campaign')) {
+                details += `<li><strong>Campaña:</strong> ${urlParams.get('utm_campaign')}</li>`;
+            }
+
+            if (urlParams.get('location')) {
+                details += `<li><strong>Ubicación:</strong> ${urlParams.get('location')}</li>`;
+            }
+
+            if (urlParams.get('type')) {
+                details += `<li><strong>Tipo:</strong> ${urlParams.get('type')}</li>`;
+            }
+
+            details += '</ul>';
+
+            clientDetails.innerHTML = details;
+            clientInfo.style.display = 'block';
+        }
+
+        // Override the search function to include filters
+        function performSearch() {
+            const location = document.getElementById('searchInput').value.trim();
+            const type = document.getElementById('typeFilter').value;
+            const rating = document.getElementById('ratingFilter').value;
+            const delivery = document.getElementById('deliveryFilter').checked;
+            const online = document.getElementById('onlineFilter').checked;
+
+            if (!location) {
+                alert('Por favor ingresa una ubicación');
+                return;
+            }
+
+            // Build query parameters
+            const params = new URLSearchParams({
+                location: location,
+                type: type
+            });
+
+            if (rating) params.append('rating', rating);
+            if (delivery) params.append('delivery', 'true');
+            if (online) params.append('online', 'true');
+
+            // Add tracking parameters from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            ['utm_source', 'utm_medium', 'utm_campaign', 'variant', 'test'].forEach(param => {
+                if (urlParams.get(param)) {
+                    params.append(param, urlParams.get(param));
+                }
+            });
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('noResults').style.display = 'none';
+
+            // Make API call
+            fetch(`/api/search?${params.toString()}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('loading').style.display = 'none';
+
+                    if (data.success && data.vinotecas.length > 0) {
+                        displayResults(data.vinotecas, data.stats);
+                    } else {
+                        document.getElementById('noResults').style.display = 'block';
+                        document.getElementById('resultsContainer').innerHTML = '';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('noResults').style.display = 'block';
+                });
+        }
+
+        // Override the display results function to show stats
+        function displayResults(vinotecas, stats) {
+            const container = document.getElementById('resultsContainer');
+            const title = document.getElementById('resultsTitle');
+            const statsDiv = document.getElementById('resultsStats');
+
+            title.textContent = `Resultados para "${vinotecas[0]?.address?.split(',')[1]?.trim() || 'la búsqueda'}"`;
+
+            // Show stats
+            let statsText = `${stats.total} resultados`;
+            if (stats.originalTotal !== stats.total) {
+                statsText += ` (${stats.originalTotal} originales filtrados)`;
+            }
+            statsText += ` en ${stats.searchTime}ms`;
+            statsDiv.textContent = statsText;
+
+            // Display results (using the existing display logic from script.js)
+            container.innerHTML = '';
+
+            vinotecas.forEach(vinoteca => {
+                const card = document.createElement('div');
+                card.className = 'result-card';
+
+                const rating = vinoteca.rating ? parseFloat(vinoteca.rating) : 0;
+                const stars = '⭐'.repeat(Math.floor(rating)) + '☆'.repeat(5 - Math.floor(rating));
+
+                card.innerHTML = `
+                    <div class="result-header">
+                        <h3>${vinoteca.name}</h3>
+                        <div class="rating">${stars} ${vinoteca.rating}</div>
+                    </div>
+                    <div class="result-details">
+                        <p><i class="fas fa-map-marker-alt"></i> ${vinoteca.address}</p>
+                        <p><i class="fas fa-phone"></i> ${vinoteca.phone}</p>
+                        ${vinoteca.snippet ? `<p class="snippet">${vinoteca.snippet}</p>` : ''}
+                    </div>
+                    <div class="result-actions">
+                        <button class="btn btn-primary" onclick="showDetails('${vinoteca.name}', '${vinoteca.address}', '${vinoteca.phone}', '${vinoteca.rating}', '${vinoteca.snippet || ''}')">
+                            <i class="fas fa-info-circle"></i> Más Info
+                        </button>
+                        <a href="https://www.google.com/maps/search/${encodeURIComponent(vinoteca.name + ' ' + vinoteca.address)}" target="_blank" class="btn btn-secondary">
+                            <i class="fas fa-map"></i> Ver en Maps
+                        </a>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
+
+        // Add event listeners
+        document.getElementById('searchBtn').addEventListener('click', performSearch);
+        document.getElementById('searchInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        // Filter change handlers
+        document.getElementById('typeFilter').addEventListener('change', performSearch);
+        document.getElementById('ratingFilter').addEventListener('change', performSearch);
+        document.getElementById('deliveryFilter').addEventListener('change', performSearch);
+        document.getElementById('onlineFilter').addEventListener('change', performSearch);
+    </script>
+</body>
+
+</html>

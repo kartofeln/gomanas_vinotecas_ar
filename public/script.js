@@ -1,19 +1,24 @@
+// Configuración de la API
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:3000'
+    : window.location.origin;
+
 // DOM Elements
 const locationInput = document.getElementById('locationInput');
 const searchBtn = document.getElementById('searchBtn');
-const loadingState = document.getElementById('loadingState');
+const loadingSection = document.getElementById('loadingSection');
 const resultsSection = document.getElementById('resultsSection');
-const errorState = document.getElementById('errorState');
-const emptyState = document.getElementById('emptyState');
+const errorSection = document.getElementById('errorSection');
 const resultsContainer = document.getElementById('resultsContainer');
-const resultsTitle = document.getElementById('resultsTitle');
-const resultsCount = document.getElementById('resultsCount');
-const errorMessage = document.getElementById('errorMessage');
+const countText = document.getElementById('countText');
+const timeText = document.getElementById('timeText');
+const errorText = document.getElementById('errorText');
 const retryBtn = document.getElementById('retryBtn');
 const locationTags = document.querySelectorAll('.location-tag');
 
 // State
 let currentSearch = '';
+let searchStartTime = 0;
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
@@ -52,7 +57,7 @@ async function performSearch() {
     const location = locationInput.value.trim();
 
     if (!location) {
-        showError('Por favor ingresa una ubicación');
+        showError('Por favor, ingresa una ubicación para buscar.');
         return;
     }
 
@@ -62,56 +67,63 @@ async function performSearch() {
     }
 
     currentSearch = location;
+    searchStartTime = Date.now();
     showLoading();
 
     try {
-        const response = await fetch(`/api/search?location=${encodeURIComponent(location)}`);
-        const data = await response.json();
+        const response = await fetch(`${API_BASE_URL}/api/search?location=${encodeURIComponent(location)}`);
 
         if (!response.ok) {
-            throw new Error(data.error || 'Error en la búsqueda');
+            throw new Error(`Error HTTP: ${response.status}`);
         }
 
+        const data = await response.json();
+
         if (data.success) {
-            displayResults(data);
+            // La API devuelve 'vinotecas' en lugar de 'results'
+            const results = data.vinotecas || data.results || [];
+            const stats = data.stats || { total: results.length };
+            displayResults(results, stats);
         } else {
-            throw new Error('No se pudieron obtener los resultados');
+            throw new Error(data.message || 'Error en la búsqueda');
         }
 
     } catch (error) {
-        console.error('Error:', error);
-        showError(error.message || 'Error al conectar con el servidor');
+        console.error('Error en la búsqueda:', error);
+        showError(`Error al buscar vinotecas: ${error.message}`);
     }
 }
 
 // Display search results
-function displayResults(data) {
-    hideAllStates();
+function displayResults(results, stats) {
+    hideAllSections();
 
-    resultsTitle.textContent = `Vinotecas en ${data.location}`;
-    resultsCount.textContent = data.count;
+    const searchTime = Math.round((Date.now() - searchStartTime) / 1000);
 
-    if (data.vinotecas.length === 0) {
-        showEmpty();
-        return;
-    }
+    // Actualizar estadísticas
+    countText.textContent = results.length;
+    timeText.textContent = searchTime;
 
+    // Limpiar contenedor
     resultsContainer.innerHTML = '';
 
-    data.vinotecas.forEach((vinoteca, index) => {
-        const card = createVinotecaCard(vinoteca, index);
-        resultsContainer.appendChild(card);
-    });
+    if (results.length === 0) {
+        resultsContainer.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-search"></i>
+                <h3>No se encontraron vinotecas</h3>
+                <p>Intenta con otra ubicación o verifica el nombre</p>
+            </div>
+        `;
+    } else {
+        // Crear tarjetas para cada vinoteca
+        results.forEach((vinoteca, index) => {
+            const card = createVinotecaCard(vinoteca, index);
+            resultsContainer.appendChild(card);
+        });
+    }
 
     resultsSection.classList.remove('hidden');
-
-    // Smooth scroll to results
-    setTimeout(() => {
-        resultsSection.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
-        });
-    }, 100);
 }
 
 // Create vinoteca card element
@@ -156,29 +168,22 @@ function createVinotecaCard(vinoteca, index) {
 
 // Show loading state
 function showLoading() {
-    hideAllStates();
-    loadingState.classList.remove('hidden');
+    hideAllSections();
+    loadingSection.classList.remove('hidden');
 }
 
 // Show error state
 function showError(message) {
-    hideAllStates();
-    errorMessage.textContent = message;
-    errorState.classList.remove('hidden');
+    hideAllSections();
+    errorText.textContent = message;
+    errorSection.classList.remove('hidden');
 }
 
-// Show empty state
-function showEmpty() {
-    hideAllStates();
-    emptyState.classList.remove('hidden');
-}
-
-// Hide all states
-function hideAllStates() {
-    loadingState.classList.add('hidden');
+// Hide all sections
+function hideAllSections() {
+    loadingSection.classList.add('hidden');
     resultsSection.classList.add('hidden');
-    errorState.classList.add('hidden');
-    emptyState.classList.add('hidden');
+    errorSection.classList.add('hidden');
 }
 
 // Utility function to escape HTML
@@ -282,4 +287,201 @@ style.textContent = `
         transition: all 0.3s ease;
     }
 `;
-document.head.appendChild(style); 
+document.head.appendChild(style);
+
+// Mostrar información detallada
+function showMoreInfo(name, address, phone, rating, source) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-wine-bottle"></i> ${name}</h3>
+                <button class="modal-close" onclick="this.parentElement.parentElement.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <div>
+                            <strong>Dirección</strong>
+                            <p>${address}</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-phone"></i>
+                        <div>
+                            <strong>Teléfono</strong>
+                            <p>${phone}</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-star"></i>
+                        <div>
+                            <strong>Calificación</strong>
+                            <p>${rating}</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-info-circle"></i>
+                        <div>
+                            <strong>Fuente</strong>
+                            <p>${source}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <a href="https://maps.google.com/?q=${encodeURIComponent(name + ' ' + address)}" 
+                       target="_blank" class="action-btn">
+                        <i class="fas fa-map"></i> Ver en Google Maps
+                    </a>
+                    <a href="https://www.google.com/search?q=${encodeURIComponent(name + ' ' + address)}" 
+                       target="_blank" class="action-btn">
+                        <i class="fas fa-search"></i> Buscar en Google
+                    </a>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Cerrar modal al hacer clic fuera
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
+// Add CSS animations
+const modalStyles = `
+<style>
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 15px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.modal-header h3 {
+    color: #333;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #666;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+}
+
+.modal-close:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.info-grid {
+    display: grid;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.info-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.info-item i {
+    color: #DC143C;
+    font-size: 1.2rem;
+    margin-top: 0.2rem;
+}
+
+.info-item strong {
+    color: #333;
+    display: block;
+    margin-bottom: 0.3rem;
+}
+
+.info-item p {
+    color: #666;
+    margin: 0;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #666;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state h3 {
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        margin: 1rem;
+    }
+    
+    .modal-actions {
+        flex-direction: column;
+    }
+}
+</style>
+`;
+
+// Insertar estilos del modal
+document.head.insertAdjacentHTML('beforeend', modalStyles); 

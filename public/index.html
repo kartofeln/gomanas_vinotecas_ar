@@ -4,100 +4,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🍷 Buscador de Vinotecas Argentina</title>
+    <title>🍷 VinotecaFinder Argentina</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
-                <div class="logo">
-                    <i class="fas fa-wine-bottle"></i>
-                    <h1>VinotecaFinder</h1>
-                </div>
-                <p class="subtitle">Descubre las mejores vinotecas de Argentina</p>
-            </div>
-        </header>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-wine-bottle"></i> VinotecaFinder Argentina</h1>
+            <p>Descubre las mejores vinotecas de Argentina con datos en tiempo real</p>
+        </div>
+    </header>
 
-        <!-- Search Section -->
-        <main class="main-content">
-            <div class="search-container">
-                <div class="search-box">
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Search Section -->
+            <section class="search-section">
+                <h2><i class="fas fa-search"></i> Buscar Vinotecas</h2>
+                <div class="search-container">
                     <div class="search-input-group">
-                        <i class="fas fa-map-marker-alt search-icon"></i>
-                        <input type="text" id="locationInput"
-                            placeholder="Ingresa una ciudad o barrio (ej: Palermo, Córdoba, Rosario)"
-                            autocomplete="off">
-                        <button id="searchBtn" class="search-button">
-                            <i class="fas fa-search"></i>
-                            Buscar
+                        <input type="text" id="locationInput" placeholder="Ej: Mendoza, Palermo, Córdoba..."
+                            class="search-input">
+                        <button id="searchBtn" class="search-btn">
+                            <i class="fas fa-search"></i> Buscar
                         </button>
                     </div>
-                </div>
 
-                <!-- Popular Locations -->
-                <div class="popular-locations">
-                    <p>Ubicaciones populares:</p>
-                    <div class="location-tags">
-                        <button class="location-tag" data-location="Palermo">Palermo</button>
-                        <button class="location-tag" data-location="Recoleta">Recoleta</button>
-                        <button class="location-tag" data-location="San Telmo">San Telmo</button>
-                        <button class="location-tag" data-location="Córdoba">Córdoba</button>
-                        <button class="location-tag" data-location="Rosario">Rosario</button>
-                        <button class="location-tag" data-location="Mendoza">Mendoza</button>
+                    <!-- Popular Locations -->
+                    <div class="popular-locations">
+                        <h3><i class="fas fa-map-marker-alt"></i> Ubicaciones Populares</h3>
+                        <div class="location-buttons">
+                            <button class="location-btn" data-location="Mendoza">
+                                <i class="fas fa-wine-bottle"></i> Mendoza
+                            </button>
+                            <button class="location-btn" data-location="Palermo">
+                                <i class="fas fa-tree"></i> Palermo
+                            </button>
+                            <button class="location-btn" data-location="Córdoba">
+                                <i class="fas fa-university"></i> Córdoba
+                            </button>
+                            <button class="location-btn" data-location="San Telmo">
+                                <i class="fas fa-history"></i> San Telmo
+                            </button>
+                            <button class="location-btn" data-location="Recoleta">
+                                <i class="fas fa-building"></i> Recoleta
+                            </button>
+                            <button class="location-btn" data-location="Rosario">
+                                <i class="fas fa-city"></i> Rosario
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Loading State -->
-            <div id="loadingState" class="loading-state hidden">
-                <div class="loading-spinner"></div>
-                <p>Buscando vinotecas...</p>
-            </div>
+            <!-- Loading Section -->
+            <section id="loadingSection" class="loading-section hidden">
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Buscando vinotecas...</p>
+                </div>
+            </section>
 
             <!-- Results Section -->
-            <div id="resultsSection" class="results-section hidden">
+            <section id="resultsSection" class="results-section hidden">
                 <div class="results-header">
-                    <h2 id="resultsTitle">Resultados</h2>
-                    <div class="results-count">
-                        <span id="resultsCount">0</span> vinotecas encontradas
+                    <h2><i class="fas fa-list"></i> Resultados</h2>
+                    <div class="results-stats">
+                        <span id="resultsCount" class="stat-item">
+                            <i class="fas fa-wine-bottle"></i> <span id="countText">0</span> vinotecas
+                        </span>
+                        <span id="resultsTime" class="stat-item">
+                            <i class="fas fa-clock"></i> <span id="timeText">0</span>s
+                        </span>
                     </div>
                 </div>
 
                 <div id="resultsContainer" class="results-container">
-                    <!-- Results will be populated here -->
+                    <!-- Results will be inserted here -->
                 </div>
-            </div>
+            </section>
 
-            <!-- Error State -->
-            <div id="errorState" class="error-state hidden">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h3>Error en la búsqueda</h3>
-                <p id="errorMessage">No se pudieron obtener los resultados</p>
-                <button id="retryBtn" class="retry-button">
-                    <i class="fas fa-redo"></i>
-                    Intentar de nuevo
-                </button>
-            </div>
+            <!-- Error Section -->
+            <section id="errorSection" class="error-section hidden">
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Error en la búsqueda</h3>
+                    <p id="errorText">No se pudieron obtener resultados.</p>
+                    <button id="retryBtn" class="retry-btn">
+                        <i class="fas fa-redo"></i> Intentar de nuevo
+                    </button>
+                </div>
+            </section>
+        </div>
+    </main>
 
-            <!-- Empty State -->
-            <div id="emptyState" class="empty-state hidden">
-                <i class="fas fa-search"></i>
-                <h3>No se encontraron vinotecas</h3>
-                <p>Intenta con otra ubicación o verifica el nombre</p>
-            </div>
-        </main>
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 VinotecaFinder Argentina. Desarrollado con ❤️ para amantes del vino.</p>
+        </div>
+    </footer>
 
-        <!-- Footer -->
-        <footer class="footer">
-            <p>&copy; 2024 VinotecaFinder - Buscador de vinotecas en Argentina</p>
-        </footer>
-    </div>
-
+    <!-- Scripts -->
     <script src="script.js"></script>
 </body>
 

@@ -1,850 +1,356 @@
-<<<<<<< HEAD
+require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const path = require('path');
-const { getSampleVinotecas } = require('./data/vinotecas_sample');
-const DataForSEOClient = require('./dataforseo_client');
-require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Inicializar cliente DataForSEO
-const dataForSEOClient = new DataForSEOClient();
-
 // Middleware
-app.use(helmet());
-app.use(compression());
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Configuración de axios
-const axiosInstance = axios.create({
-    timeout: parseInt(process.env.REQUEST_TIMEOUT) || 15000,
-    headers: {
-        'User-Agent': process.env.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Cache-Control': 'max-age=0'
-    }
-});
+// DataForSEO API configuration
+const DATAFORSEO_LOGIN = process.env.DATAFORSEO_LOGIN;
+const DATAFORSEO_PASSWORD = process.env.DATAFORSEO_PASSWORD;
 
-// Función para hacer scraping con retry y diferentes estrategias
-async function scrapeWithRetry(url, maxRetries = 3) {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            console.log(`🔄 Intento ${attempt} de ${maxRetries} para: ${url}`);
-
-            const response = await axiosInstance.get(url);
-            return response.data;
-        } catch (error) {
-            console.log(`❌ Intento ${attempt} falló: ${error.message}`);
-
-            if (attempt === maxRetries) {
-                throw error;
-            }
-
-            // Esperar antes del siguiente intento
-            await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-        }
-    }
-}
-
-// Función para buscar vinotecas en Google Maps
-async function searchVinotecasGoogleMaps(location) {
-    try {
-        const searchQuery = `vinotecas ${location} argentina`;
-        const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&tbm=lcl`;
-
-        console.log(`🔍 Buscando en Google Maps: ${url}`);
-
-        const htmlData = await scrapeWithRetry(url);
-        const $ = cheerio.load(htmlData);
-
-        const vinotecas = [];
-
-        // Estrategia 1: Buscar en resultados locales de Google
-        const localSelectors = [
-            '.rllt__details',
-            '.VkpGBb',
-            '.rlfl__tlct',
-            '[data-attrid="local_result"]',
-            '.rllt__details-link',
-            '.rllt__details-title',
-            '.dbg0pd'
-        ];
-
-        for (const selector of localSelectors) {
-            $(selector).each((index, element) => {
-                if (index < 20) {
-                    let name = '';
-                    let address = '';
-                    let rating = '';
-
-                    // Extraer nombre
-                    name = $(element).find('.rllt__details-link, .dbg0pd, .rllt__details-title').text().trim();
-                    if (!name) {
-                        name = $(element).find('a[data-attrid="local_result"]').text().trim();
-                    }
-                    if (!name) {
-                        name = $(element).text().trim();
-                    }
-
-                    // Extraer dirección
-                    address = $(element).find('.rllt__details-secondary, .rllt__details-address').text().trim();
-                    if (!address) {
-                        address = $(element).closest('.rllt__details').find('.rllt__details-secondary').text().trim();
-                    }
-
-                    // Extraer calificación
-                    rating = $(element).find('.rllt__details-rating, .rllt__details-stars').text().trim();
-
-                    if (name && name.length > 3 && !vinotecas.some(v => v.name.toLowerCase() === name.toLowerCase())) {
-                        vinotecas.push({
-                            name: name.replace(/\s+/g, ' ').trim(),
-                            address: address || `${location}, Argentina`,
-                            rating: rating || 'No disponible',
-                            source: 'Google Maps'
-                        });
-                    }
-                }
-            });
-        }
-
-        // Estrategia 2: Buscar en enlaces de Google Maps
-        $('a[href*="maps.google.com"], a[href*="google.com/maps"]').each((index, element) => {
-            if (index < 10) {
-                const text = $(element).text().trim();
-                if (text && text.length > 5 &&
-                    (text.toLowerCase().includes('vinoteca') ||
-                        text.toLowerCase().includes('bodega') ||
-                        text.toLowerCase().includes('wine'))) {
-
-                    if (!vinotecas.some(v => v.name.toLowerCase() === text.toLowerCase())) {
-                        vinotecas.push({
-                            name: text.replace(/\s+/g, ' ').trim(),
-                            address: `${location}, Argentina`,
-                            rating: 'No disponible',
-                            source: 'Google Maps'
-                        });
-                    }
-                }
-            }
-        });
-
-        console.log(`✅ Encontradas ${vinotecas.length} vinotecas en Google Maps`);
-        return vinotecas;
-
-    } catch (error) {
-        console.error('❌ Error buscando en Google Maps:', error.message);
-        return [];
-    }
-}
-
-// Función para buscar vinotecas usando DataForSEO
-async function searchVinotecasDataForSEO(location) {
-    try {
-        console.log(`🔍 DataForSEO: Iniciando búsqueda para ${location}`);
-
-        // Intentar búsqueda local primero
-        const localResults = await dataForSEOClient.searchVinotecas(location);
-
-        if (localResults.length > 0) {
-            return localResults;
-        }
-
-        // Si no hay resultados locales, intentar búsqueda Google
-        console.log(`🔍 DataForSEO: Intentando búsqueda Google para ${location}`);
-        const googleResults = await dataForSEOClient.searchGoogleVinotecas(location);
-
-        return googleResults;
-
-    } catch (error) {
-        console.error('❌ Error en DataForSEO:', error.message);
-        return [];
-    }
-}
-
-// Función para buscar vinotecas en páginas locales argentinas
-async function searchVinotecasLocales(location) {
-    try {
-        console.log(`🔍 Buscando en páginas locales argentinas para: ${location}`);
-
-        const vinotecas = [];
-
-        // Buscar en Guía Oleo
-        try {
-            const guiaOleoUrl = `https://www.guiaoleo.com.ar/buscar?q=${encodeURIComponent(`vinotecas ${location}`)}`;
-            console.log(`🔍 Buscando en Guía Oleo: ${guiaOleoUrl}`);
-
-            const response = await axiosInstance.get(guiaOleoUrl);
-            const $ = cheerio.load(response.data);
-
-            $('.result-item, .business-item, .listing-item').each((index, element) => {
-                if (index < 10) {
-                    const name = $(element).find('.business-name, .result-title, h3, h4').text().trim();
-                    const address = $(element).find('.business-address, .result-address, .address').text().trim();
-
-                    if (name && name.length > 3) {
-                        vinotecas.push({
-                            name: name.replace(/\s+/g, ' ').trim(),
-                            address: address || 'Ver en Guía Oleo',
-                            rating: 'No disponible',
-                            source: 'Guía Oleo'
-                        });
-                    }
-                }
-            });
-
-            console.log(`✅ Encontradas ${vinotecas.length} vinotecas en Guía Oleo`);
-        } catch (error) {
-            console.log(`⚠️ Error en Guía Oleo: ${error.message}`);
-        }
-
-        // Buscar en sitios específicos de Argentina
-        try {
-            // Buscar en páginas de bodegas argentinas
-            const argentinaWineUrl = `https://www.google.com/search?q=${encodeURIComponent(`bodegas ${location} mendoza argentina`)}`;
-            console.log(`🔍 Buscando bodegas argentinas: ${argentinaWineUrl}`);
-
-            const response = await axiosInstance.get(argentinaWineUrl);
-            const $ = cheerio.load(response.data);
-
-            $('a').each((index, element) => {
-                if (index < 30) {
-                    const text = $(element).text().trim();
-                    const href = $(element).attr('href') || '';
-
-                    if (text && text.length > 5 &&
-                        (text.toLowerCase().includes('bodega') ||
-                            text.toLowerCase().includes('vinoteca') ||
-                            text.toLowerCase().includes('wine') ||
-                            href.includes('bodega') ||
-                            href.includes('vinoteca'))) {
-
-                        if (!vinotecas.some(v => v.name.toLowerCase() === text.toLowerCase())) {
-                            vinotecas.push({
-                                name: text.replace(/\s+/g, ' ').trim(),
-                                address: `${location}, Argentina`,
-                                rating: 'No disponible',
-                                source: 'Búsqueda Argentina'
-                            });
-                        }
-                    }
-                }
-            });
-
-            console.log(`✅ Encontradas ${vinotecas.length} vinotecas en búsqueda argentina`);
-        } catch (error) {
-            console.log(`⚠️ Error en búsqueda argentina: ${error.message}`);
-        }
-
-        // Buscar en TripAdvisor
-        try {
-            const tripAdvisorUrl = `https://www.tripadvisor.com/Search?q=${encodeURIComponent(`vinotecas ${location} argentina`)}`;
-            console.log(`🔍 Buscando en TripAdvisor: ${tripAdvisorUrl}`);
-
-            const response = await axiosInstance.get(tripAdvisorUrl);
-            const $ = cheerio.load(response.data);
-
-            $('.result-title, .business-name, .listing-title').each((index, element) => {
-                if (index < 5) {
-                    const name = $(element).text().trim();
-                    const address = $(element).closest('.result, .business-listing').find('.address, .location').text().trim();
-
-                    if (name && name.length > 3) {
-                        vinotecas.push({
-                            name: name.replace(/\s+/g, ' ').trim(),
-                            address: address || 'Ver en TripAdvisor',
-                            rating: 'No disponible',
-                            source: 'TripAdvisor'
-                        });
-                    }
-                }
-            });
-
-            console.log(`✅ Encontradas ${vinotecas.length} vinotecas en TripAdvisor`);
-        } catch (error) {
-            console.log(`⚠️ Error en TripAdvisor: ${error.message}`);
-        }
-
-        return vinotecas;
-
-    } catch (error) {
-        console.error('❌ Error buscando en páginas locales:', error.message);
-        return [];
-    }
-}
-
-// API Routes
-app.get('/api/search', async (req, res) => {
-    try {
-        const { location = 'Buenos Aires' } = req.query;
-
-        if (!location || location.trim().length < 2) {
-            return res.status(400).json({
-                error: 'La ubicación debe tener al menos 2 caracteres'
-            });
-        }
-
-        console.log(`Buscando vinotecas en: ${location}`);
-
-        // Buscar en múltiples fuentes incluyendo DataForSEO
-        const [googleResults, localResults, dataForSEOResults] = await Promise.all([
-            searchVinotecasGoogleMaps(location),
-            searchVinotecasLocales(location),
-            searchVinotecasDataForSEO(location)
-        ]);
-
-        // Combinar y filtrar resultados duplicados
-        const allResults = [...googleResults, ...localResults, ...dataForSEOResults];
-        const uniqueResults = allResults.filter((vinoteca, index, self) =>
-            index === self.findIndex(v => v.name.toLowerCase() === vinoteca.name.toLowerCase())
-        );
-
-        // Si no se encontraron resultados reales, intentar búsqueda alternativa
-        if (uniqueResults.length === 0) {
-            console.log(`⚠️ No se encontraron resultados reales, intentando búsqueda alternativa para: ${location}`);
-
-            // Intentar búsqueda alternativa en Google
-            try {
-                const alternativeUrl = `https://www.google.com/search?q=${encodeURIComponent(`bodegas ${location} argentina`)}`;
-                const response = await axiosInstance.get(alternativeUrl);
-                const $ = cheerio.load(response.data);
-
-                const alternativeResults = [];
-
-                // Buscar enlaces que contengan palabras relacionadas con vinos
-                $('a').each((index, element) => {
-                    if (index < 20) {
-                        const text = $(element).text().trim();
-                        const href = $(element).attr('href') || '';
-
-                        if (text && text.length > 5 &&
-                            (text.toLowerCase().includes('vinoteca') ||
-                                text.toLowerCase().includes('bodega') ||
-                                text.toLowerCase().includes('wine') ||
-                                href.includes('maps.google.com'))) {
-
-                            alternativeResults.push({
-                                name: text.replace(/\s+/g, ' ').trim(),
-                                address: 'Ver en Google',
-                                rating: 'No disponible',
-                                source: 'Google Search'
-                            });
-                        }
-                    }
-                });
-
-                if (alternativeResults.length > 0) {
-                    const uniqueAlternative = alternativeResults.filter((vinoteca, index, self) =>
-                        index === self.findIndex(v => v.name.toLowerCase() === vinoteca.name.toLowerCase())
-                    );
-
-                    return res.json({
-                        success: true,
-                        location,
-                        count: uniqueAlternative.length,
-                        vinotecas: uniqueAlternative.slice(0, 10),
-                        timestamp: new Date().toISOString(),
-                        note: "Resultados alternativos encontrados"
-                    });
-                }
-            } catch (error) {
-                console.log(`⚠️ Error en búsqueda alternativa: ${error.message}`);
-            }
-
-            // Si todo falla, usar datos de ejemplo
-            console.log(`⚠️ Usando datos de ejemplo para: ${location}`);
-            const sampleResults = getSampleVinotecas(location);
-            return res.json({
-                success: true,
-                location,
-                count: sampleResults.length,
-                vinotecas: sampleResults,
-                timestamp: new Date().toISOString(),
-                note: "Datos de ejemplo - scraping no disponible"
-            });
-        }
-
-        res.json({
-            success: true,
-            location,
-            count: uniqueResults.length,
-            vinotecas: uniqueResults,
-            timestamp: new Date().toISOString()
-        });
-
-    } catch (error) {
-        console.error('Error en la búsqueda:', error);
-        res.status(500).json({
-            error: 'Error interno del servidor',
-            message: error.message
-        });
-    }
-});
-
-// Ruta principal
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Health check
+// Health check endpoint
 app.get('/health', (req, res) => {
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
-// Manejo de errores 404
-app.use((req, res) => {
-    res.status(404).json({ error: 'Ruta no encontrada' });
-});
-
-// Manejo de errores global
-app.use((error, req, res, next) => {
-    console.error('Error no manejado:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
-});
-
-app.listen(PORT, () => {
-    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-    console.log(`📊 API disponible en http://localhost:${PORT}/api/search`);
-    console.log(`🔍 Ejemplo: http://localhost:${PORT}/api/search?location=Palermo`);
-=======
-const express = require('express');
-const axios = require('axios');
-const cheerio = require('cheerio');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const path = require('path');
-const { getSampleVinotecas } = require('./data/vinotecas_sample');
-const DataForSEOClient = require('./dataforseo_client');
-require('dotenv').config();
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Inicializar cliente DataForSEO
-const dataForSEOClient = new DataForSEOClient();
-
-// Middleware
-app.use(helmet());
-app.use(compression());
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
-
-// Configuración de axios
-const axiosInstance = axios.create({
-    timeout: parseInt(process.env.REQUEST_TIMEOUT) || 15000,
-    headers: {
-        'User-Agent': process.env.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Cache-Control': 'max-age=0'
-    }
-});
-
-// Función para hacer scraping con retry y diferentes estrategias
-async function scrapeWithRetry(url, maxRetries = 3) {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            console.log(`🔄 Intento ${attempt} de ${maxRetries} para: ${url}`);
-
-            const response = await axiosInstance.get(url);
-            return response.data;
-        } catch (error) {
-            console.log(`❌ Intento ${attempt} falló: ${error.message}`);
-
-            if (attempt === maxRetries) {
-                throw error;
-            }
-
-            // Esperar antes del siguiente intento
-            await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-        }
-    }
-}
-
-// Función para buscar vinotecas en Google Maps
-async function searchVinotecasGoogleMaps(location) {
-    try {
-        const searchQuery = `vinotecas ${location} argentina`;
-        const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&tbm=lcl`;
-
-        console.log(`🔍 Buscando en Google Maps: ${url}`);
-
-        const htmlData = await scrapeWithRetry(url);
-        const $ = cheerio.load(htmlData);
-
-        const vinotecas = [];
-
-        // Estrategia 1: Buscar en resultados locales de Google
-        const localSelectors = [
-            '.rllt__details',
-            '.VkpGBb',
-            '.rlfl__tlct',
-            '[data-attrid="local_result"]',
-            '.rllt__details-link',
-            '.rllt__details-title',
-            '.dbg0pd'
-        ];
-
-        for (const selector of localSelectors) {
-            $(selector).each((index, element) => {
-                if (index < 20) {
-                    let name = '';
-                    let address = '';
-                    let rating = '';
-
-                    // Extraer nombre
-                    name = $(element).find('.rllt__details-link, .dbg0pd, .rllt__details-title').text().trim();
-                    if (!name) {
-                        name = $(element).find('a[data-attrid="local_result"]').text().trim();
-                    }
-                    if (!name) {
-                        name = $(element).text().trim();
-                    }
-
-                    // Extraer dirección
-                    address = $(element).find('.rllt__details-secondary, .rllt__details-address').text().trim();
-                    if (!address) {
-                        address = $(element).closest('.rllt__details').find('.rllt__details-secondary').text().trim();
-                    }
-
-                    // Extraer calificación
-                    rating = $(element).find('.rllt__details-rating, .rllt__details-stars').text().trim();
-
-                    if (name && name.length > 3 && !vinotecas.some(v => v.name.toLowerCase() === name.toLowerCase())) {
-                        vinotecas.push({
-                            name: name.replace(/\s+/g, ' ').trim(),
-                            address: address || `${location}, Argentina`,
-                            rating: rating || 'No disponible',
-                            source: 'Google Maps'
-                        });
-                    }
-                }
-            });
-        }
-
-        // Estrategia 2: Buscar en enlaces de Google Maps
-        $('a[href*="maps.google.com"], a[href*="google.com/maps"]').each((index, element) => {
-            if (index < 10) {
-                const text = $(element).text().trim();
-                if (text && text.length > 5 &&
-                    (text.toLowerCase().includes('vinoteca') ||
-                        text.toLowerCase().includes('bodega') ||
-                        text.toLowerCase().includes('wine'))) {
-
-                    if (!vinotecas.some(v => v.name.toLowerCase() === text.toLowerCase())) {
-                        vinotecas.push({
-                            name: text.replace(/\s+/g, ' ').trim(),
-                            address: `${location}, Argentina`,
-                            rating: 'No disponible',
-                            source: 'Google Maps'
-                        });
-                    }
-                }
-            }
-        });
-
-        console.log(`✅ Encontradas ${vinotecas.length} vinotecas en Google Maps`);
-        return vinotecas;
-
-    } catch (error) {
-        console.error('❌ Error buscando en Google Maps:', error.message);
-        return [];
-    }
-}
-
-// Función para buscar vinotecas usando DataForSEO
-async function searchVinotecasDataForSEO(location) {
-    try {
-        console.log(`🔍 DataForSEO: Iniciando búsqueda para ${location}`);
-
-        // Intentar búsqueda local primero
-        const localResults = await dataForSEOClient.searchVinotecas(location);
-
-        if (localResults.length > 0) {
-            return localResults;
-        }
-
-        // Si no hay resultados locales, intentar búsqueda Google
-        console.log(`🔍 DataForSEO: Intentando búsqueda Google para ${location}`);
-        const googleResults = await dataForSEOClient.searchGoogleVinotecas(location);
-
-        return googleResults;
-
-    } catch (error) {
-        console.error('❌ Error en DataForSEO:', error.message);
-        return [];
-    }
-}
-
-// Función para buscar vinotecas en páginas locales argentinas
-async function searchVinotecasLocales(location) {
-    try {
-        console.log(`🔍 Buscando en páginas locales argentinas para: ${location}`);
-
-        const vinotecas = [];
-
-        // Buscar en Guía Oleo
-        try {
-            const guiaOleoUrl = `https://www.guiaoleo.com.ar/buscar?q=${encodeURIComponent(`vinotecas ${location}`)}`;
-            console.log(`🔍 Buscando en Guía Oleo: ${guiaOleoUrl}`);
-
-            const response = await axiosInstance.get(guiaOleoUrl);
-            const $ = cheerio.load(response.data);
-
-            $('.result-item, .business-item, .listing-item').each((index, element) => {
-                if (index < 10) {
-                    const name = $(element).find('.business-name, .result-title, h3, h4').text().trim();
-                    const address = $(element).find('.business-address, .result-address, .address').text().trim();
-
-                    if (name && name.length > 3) {
-                        vinotecas.push({
-                            name: name.replace(/\s+/g, ' ').trim(),
-                            address: address || 'Ver en Guía Oleo',
-                            rating: 'No disponible',
-                            source: 'Guía Oleo'
-                        });
-                    }
-                }
-            });
-
-            console.log(`✅ Encontradas ${vinotecas.length} vinotecas en Guía Oleo`);
-        } catch (error) {
-            console.log(`⚠️ Error en Guía Oleo: ${error.message}`);
-        }
-
-        // Buscar en sitios específicos de Argentina
-        try {
-            // Buscar en páginas de bodegas argentinas
-            const argentinaWineUrl = `https://www.google.com/search?q=${encodeURIComponent(`bodegas ${location} mendoza argentina`)}`;
-            console.log(`🔍 Buscando bodegas argentinas: ${argentinaWineUrl}`);
-
-            const response = await axiosInstance.get(argentinaWineUrl);
-            const $ = cheerio.load(response.data);
-
-            $('a').each((index, element) => {
-                if (index < 30) {
-                    const text = $(element).text().trim();
-                    const href = $(element).attr('href') || '';
-
-                    if (text && text.length > 5 &&
-                        (text.toLowerCase().includes('bodega') ||
-                            text.toLowerCase().includes('vinoteca') ||
-                            text.toLowerCase().includes('wine') ||
-                            href.includes('bodega') ||
-                            href.includes('vinoteca'))) {
-
-                        if (!vinotecas.some(v => v.name.toLowerCase() === text.toLowerCase())) {
-                            vinotecas.push({
-                                name: text.replace(/\s+/g, ' ').trim(),
-                                address: `${location}, Argentina`,
-                                rating: 'No disponible',
-                                source: 'Búsqueda Argentina'
-                            });
-                        }
-                    }
-                }
-            });
-
-            console.log(`✅ Encontradas ${vinotecas.length} vinotecas en búsqueda argentina`);
-        } catch (error) {
-            console.log(`⚠️ Error en búsqueda argentina: ${error.message}`);
-        }
-
-        // Buscar en TripAdvisor
-        try {
-            const tripAdvisorUrl = `https://www.tripadvisor.com/Search?q=${encodeURIComponent(`vinotecas ${location} argentina`)}`;
-            console.log(`🔍 Buscando en TripAdvisor: ${tripAdvisorUrl}`);
-
-            const response = await axiosInstance.get(tripAdvisorUrl);
-            const $ = cheerio.load(response.data);
-
-            $('.result-title, .business-name, .listing-title').each((index, element) => {
-                if (index < 5) {
-                    const name = $(element).text().trim();
-                    const address = $(element).closest('.result, .business-listing').find('.address, .location').text().trim();
-
-                    if (name && name.length > 3) {
-                        vinotecas.push({
-                            name: name.replace(/\s+/g, ' ').trim(),
-                            address: address || 'Ver en TripAdvisor',
-                            rating: 'No disponible',
-                            source: 'TripAdvisor'
-                        });
-                    }
-                }
-            });
-
-            console.log(`✅ Encontradas ${vinotecas.length} vinotecas en TripAdvisor`);
-        } catch (error) {
-            console.log(`⚠️ Error en TripAdvisor: ${error.message}`);
-        }
-
-        return vinotecas;
-
-    } catch (error) {
-        console.error('❌ Error buscando en páginas locales:', error.message);
-        return [];
-    }
-}
-
-// API Routes
-app.get('/api/search', async (req, res) => {
-    try {
-        const { location = 'Buenos Aires' } = req.query;
-
-        if (!location || location.trim().length < 2) {
-            return res.status(400).json({
-                error: 'La ubicación debe tener al menos 2 caracteres'
-            });
-        }
-
-        console.log(`Buscando vinotecas en: ${location}`);
-
-        // Buscar en múltiples fuentes incluyendo DataForSEO
-        const [googleResults, localResults, dataForSEOResults] = await Promise.all([
-            searchVinotecasGoogleMaps(location),
-            searchVinotecasLocales(location),
-            searchVinotecasDataForSEO(location)
-        ]);
-
-        // Combinar y filtrar resultados duplicados
-        const allResults = [...googleResults, ...localResults, ...dataForSEOResults];
-        const uniqueResults = allResults.filter((vinoteca, index, self) =>
-            index === self.findIndex(v => v.name.toLowerCase() === vinoteca.name.toLowerCase())
-        );
-
-        // Si no se encontraron resultados reales, intentar búsqueda alternativa
-        if (uniqueResults.length === 0) {
-            console.log(`⚠️ No se encontraron resultados reales, intentando búsqueda alternativa para: ${location}`);
-
-            // Intentar búsqueda alternativa en Google
-            try {
-                const alternativeUrl = `https://www.google.com/search?q=${encodeURIComponent(`bodegas ${location} argentina`)}`;
-                const response = await axiosInstance.get(alternativeUrl);
-                const $ = cheerio.load(response.data);
-
-                const alternativeResults = [];
-
-                // Buscar enlaces que contengan palabras relacionadas con vinos
-                $('a').each((index, element) => {
-                    if (index < 20) {
-                        const text = $(element).text().trim();
-                        const href = $(element).attr('href') || '';
-
-                        if (text && text.length > 5 &&
-                            (text.toLowerCase().includes('vinoteca') ||
-                                text.toLowerCase().includes('bodega') ||
-                                text.toLowerCase().includes('wine') ||
-                                href.includes('maps.google.com'))) {
-
-                            alternativeResults.push({
-                                name: text.replace(/\s+/g, ' ').trim(),
-                                address: 'Ver en Google',
-                                rating: 'No disponible',
-                                source: 'Google Search'
-                            });
-                        }
-                    }
-                });
-
-                if (alternativeResults.length > 0) {
-                    const uniqueAlternative = alternativeResults.filter((vinoteca, index, self) =>
-                        index === self.findIndex(v => v.name.toLowerCase() === vinoteca.name.toLowerCase())
-                    );
-
-                    return res.json({
-                        success: true,
-                        location,
-                        count: uniqueAlternative.length,
-                        vinotecas: uniqueAlternative.slice(0, 10),
-                        timestamp: new Date().toISOString(),
-                        note: "Resultados alternativos encontrados"
-                    });
-                }
-            } catch (error) {
-                console.log(`⚠️ Error en búsqueda alternativa: ${error.message}`);
-            }
-
-            // Si todo falla, usar datos de ejemplo
-            console.log(`⚠️ Usando datos de ejemplo para: ${location}`);
-            const sampleResults = getSampleVinotecas(location);
-            return res.json({
-                success: true,
-                location,
-                count: sampleResults.length,
-                vinotecas: sampleResults,
-                timestamp: new Date().toISOString(),
-                note: "Datos de ejemplo - scraping no disponible"
-            });
-        }
-
-        res.json({
-            success: true,
-            location,
-            count: uniqueResults.length,
-            vinotecas: uniqueResults,
-            timestamp: new Date().toISOString()
-        });
-
-    } catch (error) {
-        console.error('Error en la búsqueda:', error);
-        res.status(500).json({
-            error: 'Error interno del servidor',
-            message: error.message
-        });
-    }
-});
-
-// Ruta principal
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Health check para Railway
-app.get('/api/health', (req, res) => {
     res.json({
         status: 'OK',
         timestamp: new Date().toISOString(),
-        service: 'Vinoteca Search API',
-        version: '1.0.0'
+        environment: process.env.NODE_ENV || 'development',
+        dataforseo: !!(DATAFORSEO_LOGIN && DATAFORSEO_PASSWORD)
     });
 });
 
-// Health check alternativo
-app.get('/health', (req, res) => {
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+// API endpoint for searching vinotecas
+app.get('/api/search', async (req, res) => {
+    try {
+        const {
+            location,
+            type = 'vinotecas',
+            rating,
+            delivery,
+            online,
+            mobile,
+            theme,
+            utm_source,
+            utm_medium,
+            utm_campaign,
+            variant,
+            test
+        } = req.query;
+
+        if (!location) {
+            return res.status(400).json({
+                success: false,
+                message: 'Location parameter is required'
+            });
+        }
+
+        console.log(`Searching for ${type} in: ${location}`);
+        if (rating) console.log(`Filtering by rating: ${rating}+`);
+        if (delivery) console.log(`Filtering by delivery: ${delivery}`);
+        if (online) console.log(`Filtering by online store: ${online}`);
+
+        const results = [];
+        const startTime = Date.now();
+
+        // Search using DataForSEO if credentials are available
+        if (DATAFORSEO_LOGIN && DATAFORSEO_PASSWORD) {
+            try {
+                const dataForSEOResults = await searchDataForSEO(location, type);
+                results.push(...dataForSEOResults);
+                console.log(`Found ${dataForSEOResults.length} results from DataForSEO`);
+            } catch (error) {
+                console.error('DataForSEO error:', error.message);
+            }
+        }
+
+        // Fallback to simulated data if no DataForSEO results
+        if (results.length === 0) {
+            const simulatedResults = generateSimulatedData(location, type);
+            results.push(...simulatedResults);
+            console.log(`Using ${simulatedResults.length} simulated results`);
+        }
+
+        // Apply filters
+        let filteredResults = results;
+
+        // Filter by rating
+        if (rating) {
+            filteredResults = filteredResults.filter(vinoteca => {
+                const vinotecaRating = parseFloat(vinoteca.rating);
+                const minRating = parseFloat(rating);
+                return vinotecaRating >= minRating;
+            });
+        }
+
+        // Filter by delivery
+        if (delivery === 'true') {
+            filteredResults = filteredResults.filter(vinoteca =>
+                vinoteca.snippet && vinoteca.snippet.toLowerCase().includes('envío')
+            );
+        }
+
+        // Filter by online store
+        if (online === 'true') {
+            filteredResults = filteredResults.filter(vinoteca =>
+                vinoteca.link && vinoteca.link.includes('http')
+            );
+        }
+
+        const searchTime = Date.now() - startTime;
+
+        // Add tracking information
+        const tracking = {
+            utm_source,
+            utm_medium,
+            utm_campaign,
+            variant,
+            test,
+            mobile: mobile === 'true',
+            theme: theme || 'light'
+        };
+
+        res.json({
+            success: true,
+            vinotecas: filteredResults,
+            stats: {
+                total: filteredResults.length,
+                originalTotal: results.length,
+                searchTime: searchTime,
+                sources: filteredResults.map(r => r.source).filter((v, i, a) => a.indexOf(v) === i),
+                filters: {
+                    type,
+                    rating,
+                    delivery,
+                    online
+                },
+                tracking
+            }
+        });
+
+    } catch (error) {
+        console.error('Search error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error searching for vinotecas'
+        });
+    }
 });
 
-// Manejo de errores 404
-app.use((req, res) => {
-    res.status(404).json({ error: 'Ruta no encontrada' });
+// DataForSEO search function using axios directly
+async function searchDataForSEO(location, type = 'vinotecas') {
+    const results = [];
+
+    try {
+        const keyword = `${type} ${location} Argentina`;
+        console.log('Searching DataForSEO for:', keyword);
+
+        const response = await axios.post('https://api.dataforseo.com/v3/serp/google/organic/live/regular', [{
+            location_code: 2104, // Argentina
+            language_code: "es",
+            keyword: keyword,
+            depth: 10
+        }], {
+            auth: {
+                username: DATAFORSEO_LOGIN,
+                password: DATAFORSEO_PASSWORD
+            },
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.data && response.data.tasks && response.data.tasks[0]) {
+            const task = response.data.tasks[0];
+
+            if (task.status_code === 20000 && task.result && task.result[0]) {
+                const items = task.result[0].items || [];
+                console.log(`Found ${items.length} items from DataForSEO`);
+
+                items.forEach((item, index) => {
+                    // Check if it's a relevant vinoteca result
+                    if (item.title && item.url && isVinotecaRelevant(item.title, item.description)) {
+                        const vinoteca = {
+                            name: cleanVinotecaName(item.title),
+                            address: extractAddress(item.description) || `${location}, Argentina`,
+                            phone: extractPhone(item.description) || 'No disponible',
+                            rating: extractRating(item.description) || 'Sin calificación',
+                            source: 'DataForSEO',
+                            link: item.url,
+                            snippet: item.description || ''
+                        };
+
+                        // Avoid duplicates
+                        if (!results.some(r => r.name === vinoteca.name)) {
+                            results.push(vinoteca);
+                            console.log(`Added vinoteca: ${vinoteca.name}`);
+                        }
+                    }
+                });
+            } else {
+                console.log('Task status:', task.status_code, task.status_message);
+            }
+        }
+
+    } catch (error) {
+        console.error('DataForSEO API error:', error.message);
+        if (error.response) {
+            console.error('Error response:', error.response.data);
+        }
+    }
+
+    return results;
+}
+
+// Helper function to check if a result is relevant to vinotecas
+function isVinotecaRelevant(title, description = '') {
+    const vinotecaKeywords = [
+        'vinoteca', 'vino', 'wine', 'bodega', 'bodegas', 'tienda de vino',
+        'wine shop', 'wine store', 'casa de vinos', 'elixir', 'viognier',
+        'sangre roja', 'barriga', 'toneles', 'mala boca', 'bodegón',
+        'enoteca', 'tradición vinos', 'sol y vino', 'código vinario'
+    ];
+
+    const text = (title + ' ' + description).toLowerCase();
+    return vinotecaKeywords.some(keyword => text.includes(keyword));
+}
+
+// Helper function to clean vinoteca names
+function cleanVinotecaName(title) {
+    return title
+        .replace(/vinoteca|vino|wine|shop|store|tienda|bodega/gi, '')
+        .replace(/[-–—]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+// Helper functions for data extraction
+function extractAddress(text) {
+    if (!text) return null;
+    const addressMatch = text.match(/([A-Za-záéíóúñÁÉÍÓÚÑ\s]+,\s*[A-Za-záéíóúñÁÉÍÓÚÑ\s]+)/);
+    return addressMatch ? addressMatch[1].trim() : null;
+}
+
+function extractPhone(text) {
+    if (!text) return null;
+    const phoneMatch = text.match(/(\+\d{1,3}\s?)?(\d{2,4}\s?)?(\d{3,4}\s?)?(\d{3,4})/);
+    return phoneMatch ? phoneMatch[0].trim() : null;
+}
+
+function extractRating(text) {
+    if (!text) return null;
+    const ratingMatch = text.match(/(\d+(?:\.\d+)?)\s*\/\s*5/);
+    return ratingMatch ? ratingMatch[1] : null;
+}
+
+// Generate simulated data for testing
+function generateSimulatedData(location, type = 'vinotecas') {
+    const typeNames = {
+        'vinotecas': 'Vinoteca',
+        'bodegas': 'Bodega',
+        'tiendas': 'Tienda de Vinos',
+        'enotecas': 'Enoteca'
+    };
+
+    const typeName = typeNames[type] || 'Vinoteca';
+
+    const vinotecas = [
+        {
+            name: `${typeName} ${location}`,
+            address: `Av. Principal 123, ${location}`,
+            phone: '+54 11 1234-5678',
+            rating: '4.5/5',
+            source: 'Simulated Data',
+            snippet: 'Gran selección de vinos argentinos y del mundo. Envíos a domicilio disponibles.'
+        },
+        {
+            name: `${typeName} Premium ${location}`,
+            address: `Calle del Vino 456, ${location}`,
+            phone: '+54 11 9876-5432',
+            rating: '4.2/5',
+            source: 'Simulated Data',
+            snippet: 'Vinos de alta gama y asesoramiento especializado. Tienda online disponible.'
+        },
+        {
+            name: `Casa de Vinos ${location}`,
+            address: `Plaza Central 789, ${location}`,
+            phone: '+54 11 5555-1234',
+            rating: '4.7/5',
+            source: 'Simulated Data',
+            snippet: 'Más de 20 años de experiencia en vinos. Envíos gratuitos en la zona.'
+        },
+        {
+            name: `El Rincón del Vino`,
+            address: `Esquina de la Paz 321, ${location}`,
+            phone: '+54 11 4444-5678',
+            rating: '4.0/5',
+            source: 'Simulated Data',
+            snippet: 'Ambiente acogedor para degustar vinos. Cata de vinos los fines de semana.'
+        },
+        {
+            name: `Vinos y Más`,
+            address: `Boulevard del Sabor 654, ${location}`,
+            phone: '+54 11 3333-9999',
+            rating: '4.3/5',
+            source: 'Simulated Data',
+            snippet: 'Amplia variedad de vinos nacionales e importados. Descuentos por mayor.'
+        }
+    ];
+
+    return vinotecas;
+}
+
+// Serve the main application with URL parameter support
+app.get('/', (req, res) => {
+    // Check if there are URL parameters for client customization
+    const { location, type, rating, delivery, online, mobile, theme, utm_source, utm_medium, utm_campaign } = req.query;
+
+    if (location) {
+        // If location parameter is provided, redirect to the search page with parameters
+        const params = new URLSearchParams();
+        if (location) params.append('location', location);
+        if (type) params.append('type', type);
+        if (rating) params.append('rating', rating);
+        if (delivery) params.append('delivery', delivery);
+        if (online) params.append('online', online);
+        if (mobile) params.append('mobile', mobile);
+        if (theme) params.append('theme', theme);
+        if (utm_source) params.append('utm_source', utm_source);
+        if (utm_medium) params.append('utm_medium', utm_medium);
+        if (utm_campaign) params.append('utm_campaign', utm_campaign);
+
+        const redirectUrl = `/search.html?${params.toString()}`;
+        console.log(`Redirecting client to: ${redirectUrl}`);
+        return res.redirect(redirectUrl);
+    }
+
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Manejo de errores global
-app.use((error, req, res, next) => {
-    console.error('Error no manejado:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+// Serve search page for client URLs
+app.get('/search', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'search.html'));
 });
 
+// Start server
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-    console.log(`📊 API disponible en /api/search`);
-    console.log(`🔍 Ejemplo: /api/search?location=Palermo`);
-    console.log(`💚 Health check: /api/health`);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📱 Web app available at: http://localhost:${PORT}`);
+    console.log(`🔍 API endpoint: http://localhost:${PORT}/api/search`);
+
+    if (DATAFORSEO_LOGIN && DATAFORSEO_PASSWORD) {
+        console.log('✅ DataForSEO credentials configured');
+    } else {
+        console.log('⚠️  DataForSEO credentials not found, using simulated data');
+        console.log('💡 To use real data, set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD environment variables');
+    }
 });
+
+module.exports = app;

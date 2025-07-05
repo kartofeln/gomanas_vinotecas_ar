@@ -1,272 +1,191 @@
 # 🍷 VinotecaFinder Argentina
 
-Una aplicación web moderna para buscar vinotecas en Argentina usando web scraping, APIs y una interfaz Streamlit elegante.
+Una aplicación web moderna para buscar vinotecas en Argentina con datos en tiempo real.
 
-## 🚀 Características
+## ✨ Características
 
-- 🔍 **Búsqueda inteligente** en múltiples fuentes
-- 📊 **Datos en tiempo real** de vinotecas argentinas
-- 🗺️ **Mapas interactivos** con ubicaciones
-- 📱 **Interfaz moderna con Streamlit**
-- 📈 **Estadísticas y gráficos** en tiempo real
-- 🔄 **Actualización automática** de datos
+- 🔍 **Búsqueda en tiempo real** de vinotecas por ubicación
+- 📍 **Ubicaciones populares** predefinidas (Mendoza, Palermo, Córdoba, etc.)
+- 📱 **Interfaz moderna y responsive** que funciona en móviles y desktop
+- 🗺️ **Integración con Google Maps** para ver ubicaciones
+- ⭐ **Calificaciones y reseñas** de las vinotecas
+- 📞 **Información de contacto** (teléfonos, direcciones)
+- 🚀 **Despliegue fácil** en Railway, Heroku, Vercel, etc.
+
+## 🚀 Inicio Rápido
+
+### Opción 1: Ejecutar Localmente
+
+#### Windows
+```bash
+# Hacer doble clic en start_api.bat
+# O ejecutar en PowerShell:
+.\start_api.bat
+```
+
+#### Linux/Mac
+```bash
+# Dar permisos de ejecución
+chmod +x start_api.sh
+
+# Ejecutar
+./start_api.sh
+```
+
+#### Manual
+```bash
+# Instalar dependencias
+npm install
+
+# Iniciar servidor
+npm start
+```
+
+### Opción 2: Desplegar en Railway
+
+1. **Fork este repositorio** en GitHub
+2. **Conecta Railway** con tu repositorio
+3. **Configura las variables de entorno** (opcional):
+   - `DATAFORSEO_LOGIN`: Tu login de DataForSEO
+   - `DATAFORSEO_PASSWORD`: Tu password de DataForSEO
+4. **Deploy automático** - Railway detectará la configuración
+
+## 🌐 Uso
+
+1. **Abre la aplicación** en tu navegador: `http://localhost:3000`
+2. **Ingresa una ubicación** (ej: "Mendoza", "Palermo", "Córdoba")
+3. **Haz clic en "Buscar"** o usa las ubicaciones populares
+4. **Explora los resultados** con información detallada
+5. **Usa "Más Info"** para ver detalles completos
+6. **Abre en Google Maps** para ver la ubicación
+
+## 📊 Fuentes de Datos
+
+- **DataForSEO API** (si las credenciales están configuradas)
+- **Datos simulados** como fallback
+- **Google Maps** para ubicaciones
+- **Búsqueda web** para información adicional
 
 ## 🛠️ Tecnologías
 
-- **Backend**: Node.js, Express, Axios, Cheerio
-- **Frontend**: Streamlit, Plotly, Folium
+- **Frontend**: HTML5, CSS3, JavaScript (Vanilla)
+- **Backend**: Node.js, Express.js
 - **APIs**: DataForSEO, Google Maps
-- **Scraping**: Web scraping inteligente
-- **Deploy**: Heroku, Vercel, Railway, Streamlit Cloud
+- **Deployment**: Railway, Heroku, Vercel
 
-## 📦 Instalación
-
-### Prerrequisitos
-
-- Python 3.8+
-- Node.js (v18 o superior)
-- pip y npm
-
-### Pasos de instalación
-
-1. **Clonar el repositorio**
-   ```bash
-   git clone <tu-repositorio>
-   cd vinoteca-search-argentina
-   ```
-
-2. **Instalar dependencias de Python**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Instalar dependencias de Node.js**
-   ```bash
-   npm install
-   ```
-
-4. **Configurar variables de entorno**
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Editar `.env` con tus credenciales:
-   ```env
-   DATAFORSEO_LOGIN=tu_login
-   DATAFORSEO_PASSWORD=tu_password
-   PORT=3000
-   ```
-
-5. **Ejecutar la aplicación**
-
-   **Opción A: Solo Streamlit (recomendado para deploy)**
-   ```bash
-   streamlit run app.py
-   ```
-
-   **Opción B: Backend + Frontend completo**
-   ```bash
-   # Terminal 1: Backend Node.js
-   npm start
-   
-   # Terminal 2: Frontend Streamlit
-   streamlit run app.py
-   ```
-
-6. **Acceder a la aplicación**
-   - Streamlit: http://localhost:8501
-   - API Node.js: http://localhost:3000/api/search
-
-## 🎯 Uso
-
-### Interfaz Streamlit
-
-La aplicación Streamlit incluye:
-
-- **🔍 Buscar Vinotecas**: Búsqueda principal con ubicaciones populares
-- **📊 Estadísticas**: Gráficos y métricas de los resultados
-- **🗺️ Mapa**: Visualización interactiva de ubicaciones
-- **ℹ️ Acerca de**: Información del proyecto
-
-### API Endpoints
-
-- `GET /api/search?location=Palermo` - Buscar vinotecas en una ubicación
-
-### Ejemplo de respuesta
-
-```json
-{
-  "success": true,
-  "location": "Palermo",
-  "vinotecas": [
-    {
-      "name": "Vinoteca Palermo",
-      "address": "Av. Santa Fe 1234, Palermo",
-      "rating": "4.5",
-      "source": "Google Maps"
-    }
-  ]
-}
-```
-
-## 📍 Fuentes de Datos
-
-- **Google Maps**: Búsqueda local de vinotecas
-- **DataForSEO**: API de datos de negocios
-- **Guía Oleo**: Directorio gastronómico argentino
-- **TripAdvisor**: Reseñas y recomendaciones
-- **Búsquedas locales**: Scraping de sitios argentinos
-
-## 🚀 Deploy
-
-### Streamlit Cloud (Recomendado)
-
-1. **Subir a GitHub**
-   ```bash
-   git add .
-   git commit -m "Initial commit"
-   git push origin main
-   ```
-
-2. **Conectar a Streamlit Cloud**
-   - Ve a [share.streamlit.io](https://share.streamlit.io)
-   - Conecta tu repositorio de GitHub
-   - Configura el archivo principal: `app.py`
-   - **Python version:** 3.11 (importante para compatibilidad)
-   - Configura variables de entorno si es necesario
-
-3. **Configurar variables de entorno**
-   - `DATAFORSEO_LOGIN`: Tu login de DataForSEO
-   - `DATAFORSEO_PASSWORD`: Tu password de DataForSEO
-
-4. **Deploy automático**
-   - Streamlit Cloud detectará cambios automáticamente
-   - Tu app estará disponible en `https://tu-app.streamlit.app`
-
-**⚠️ Nota importante:** Si ves errores de compilación de pandas, asegúrate de:
-- Usar Python 3.11 en Streamlit Cloud
-- Tener todas las dependencias actualizadas en `requirements.txt`
-- El archivo `packages.txt` incluye dependencias del sistema necesarias
-- **IMPORTANTE**: El archivo `packages.txt` NO debe contener comentarios, solo nombres de paquetes
-- **SOLUCIÓN RÁPIDA**: Si persisten errores, haz un commit vacío para forzar redeploy
-
-### Heroku
-
-1. **Crear aplicación en Heroku**
-   ```bash
-   heroku create tu-app-name
-   ```
-
-2. **Configurar variables de entorno**
-   ```bash
-   heroku config:set DATAFORSEO_LOGIN=tu_login
-   heroku config:set DATAFORSEO_PASSWORD=tu_password
-   ```
-
-3. **Deploy**
-   ```bash
-   git push heroku main
-   ```
-
-### Railway
-
-1. **Conectar repositorio a Railway**
-2. **Configurar variables de entorno**
-3. **Deploy automático**
-
-### Vercel
-
-1. **Conectar repositorio a Vercel**
-2. **Configurar build command**: `pip install -r requirements.txt && streamlit run app.py`
-3. **Configurar variables de entorno**
-
-## 🔧 Configuración
-
-### Variables de Entorno
-
-| Variable | Descripción | Requerido |
-|----------|-------------|-----------|
-| `DATAFORSEO_LOGIN` | Login de DataForSEO | Sí |
-| `DATAFORSEO_PASSWORD` | Password de DataForSEO | Sí |
-| `PORT` | Puerto del servidor Node.js | No (default: 3000) |
-
-### Personalización
-
-Puedes modificar las fuentes de datos editando `server.js`:
-
-```javascript
-// Agregar nueva fuente
-const searchNewSource = async (location) => {
-  // Tu lógica de búsqueda
-};
-```
-
-## 📊 Estructura del Proyecto
+## 📁 Estructura del Proyecto
 
 ```
-vinoteca-search-argentina/
-├── app.py                 # Aplicación principal Streamlit
-├── server.js              # Servidor Node.js (API)
-├── dataforseo_client.js   # Cliente DataForSEO
-├── utils.js               # Utilidades
-├── requirements.txt       # Dependencias Python
+├── public/                 # Archivos estáticos
+│   ├── index.html         # Página principal
+│   ├── styles.css         # Estilos CSS
+│   └── script.js          # JavaScript del frontend
+├── server.js              # Servidor Express
 ├── package.json           # Dependencias Node.js
-├── .streamlit/            # Configuración Streamlit
-│   └── config.toml        # Tema y configuración
-├── Procfile               # Configuración para Heroku
-├── runtime.txt            # Versión de Python
-├── setup.sh               # Script de instalación
-├── .env.example           # Variables de entorno ejemplo
+├── railway.json           # Configuración Railway
+├── start_api.bat          # Script Windows
+├── start_api.sh           # Script Linux/Mac
 └── README.md              # Este archivo
 ```
 
-## 🎨 Personalización
+## 🔧 Configuración
 
-### Tema Streamlit
+### Configurar DataForSEO (Datos Reales)
 
-Edita `.streamlit/config.toml` para personalizar el tema:
+Para usar datos reales de vinotecas, necesitas credenciales de DataForSEO:
 
-```toml
-[theme]
-primaryColor = "#DC143C"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F0F2F6"
-textColor = "#262730"
+1. **Obtén credenciales gratuitas** en [DataForSEO](https://dataforseo.com/)
+2. **Configura las credenciales**:
+
+#### Windows
+```bash
+# Ejecutar el script de configuración
+setup_dataforseo.bat
 ```
 
-### Agregar nuevas funcionalidades
+#### Linux/Mac
+```bash
+# Dar permisos de ejecución
+chmod +x setup_dataforseo.sh
 
-1. **Nuevas páginas**: Agrega opciones al menú en `app.py`
-2. **Nuevas fuentes de datos**: Modifica `server.js`
-3. **Nuevos gráficos**: Usa Plotly en `app.py`
+# Ejecutar el script de configuración
+./setup_dataforseo.sh
+```
+
+#### Manual
+```bash
+# Crear archivo .env
+echo "DATAFORSEO_LOGIN=tu_login" > .env
+echo "DATAFORSEO_PASSWORD=tu_password" >> .env
+```
+
+### Variables de Entorno
+
+```bash
+# DataForSEO API Credentials (obligatorio para datos reales)
+DATAFORSEO_LOGIN=tu_login
+DATAFORSEO_PASSWORD=tu_password
+
+# Puerto del servidor (por defecto: 3000)
+PORT=3000
+
+# Entorno (development/production)
+NODE_ENV=development
+```
+
+### API Endpoints
+
+- `GET /` - Página principal
+- `GET /api/search?location=LOCATION` - Buscar vinotecas
+- `GET /health` - Health check
+
+## 🚀 Despliegue
+
+### Railway (Recomendado)
+1. Fork el repositorio
+2. Conecta Railway
+3. Deploy automático
+
+### Heroku
+```bash
+heroku create tu-app-vinoteca
+git push heroku main
+```
+
+### Vercel
+```bash
+npm install -g vercel
+vercel
+```
+
+## 📱 URLs para Clientes
+
+Una vez desplegado, puedes generar URLs para diferentes clientes:
+
+- **URL Principal**: `https://tu-app.railway.app`
+- **URL con Ubicación**: `https://tu-app.railway.app?location=Mendoza`
+- **URL Específica**: `https://tu-app.railway.app?location=Palermo`
 
 ## 🤝 Contribuir
 
 1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
+2. Crea una rama: `git checkout -b feature/nueva-funcionalidad`
+3. Commit: `git commit -m 'Agregar nueva funcionalidad'`
+4. Push: `git push origin feature/nueva-funcionalidad`
 5. Abre un Pull Request
 
-## 📝 Licencia
+## 📄 Licencia
 
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
+MIT License - ver [LICENSE](LICENSE) para detalles.
 
-## 📞 Soporte
+## 🆘 Soporte
 
-Si tienes problemas o sugerencias:
-
-- 📧 Email: tu-email@ejemplo.com
-- 🐛 Issues: [GitHub Issues](https://github.com/tu-usuario/tu-repo/issues)
-- 💬 Discord: [Tu servidor Discord]
-
-## 🙏 Agradecimientos
-
-- DataForSEO por proporcionar datos de alta calidad
-- Streamlit por la excelente plataforma de desarrollo
-- La comunidad de desarrolladores argentinos
-- Todos los contribuidores del proyecto
+Si tienes problemas:
+1. Verifica que Node.js esté instalado
+2. Ejecuta `npm install` para instalar dependencias
+3. Revisa los logs del servidor
+4. Abre un issue en GitHub
 
 ---
 
-**🍷 ¡Disfruta explorando las mejores vinotecas de Argentina con nuestra aplicación Streamlit!** 
+🍷 **Desarrollado con ❤️ para amantes del vino en Argentina** 
